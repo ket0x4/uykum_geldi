@@ -1,2 +1,12 @@
 venv/
-*pt
+.venv/
+*.pt
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.ruff_cache/
+.DS_Store
+config.toml

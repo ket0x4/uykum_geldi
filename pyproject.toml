@@ -1,0 +1,26 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "uykum-geldi"
+version = "0.2.0"
+description = "Modern OpenCV & YOLO-based human detection alarm tool"
+readme = "README.md"
+requires-python = ">=3.10,<3.13"
+license = { text = "MIT" }
+authors = [
+    { name = "ibrahim yöndemli" }
+]
+dependencies = [
+    "ultralytics>=8.3.0",
+    "opencv-python>=4.10.0",
+    "torch>=2.2.0",
+    "torchvision>=0.17.0",
+]
+
+[project.scripts]
+uykum-geldi = "uykum_geldi.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/uykum_geldi"]
