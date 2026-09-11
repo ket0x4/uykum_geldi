@@ -1,8 +1,10 @@
 import argparse
-from pathlib import Path
+import contextlib
 import subprocess
 import sys
 import time
+from pathlib import Path
+
 import cv2
 import torch
 from ultralytics import YOLO
@@ -29,29 +31,35 @@ def play_alarm(sound_path: str):
         p = Path(__file__).resolve().parent.parent.parent / sound_path
     if not p.is_file():
         return
-    cmd = ["afplay", str(p)] if sys.platform == "darwin" else ["ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet", str(p)]
+    cmd = (
+        ["afplay", str(p)]
+        if sys.platform == "darwin"
+        else ["ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet", str(p)]
+    )
     try:
         subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    except Exception:
+    except (OSError, subprocess.SubprocessError):
         print("\a", end="", flush=True)
 
 
 def send_notification(msg: str):
     if sys.platform == "darwin":
-        try:
+        with contextlib.suppress(OSError, subprocess.SubprocessError):
             subprocess.Popen(
-                ["osascript", "-e", f'display notification "{msg}" with title "Uykum Geldi"'],
+                [
+                    "osascript",
+                    "-e",
+                    f'display notification "{msg}" with title "Uykum Geldi"',
+                ],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
-        except Exception:
-            pass
 
 
 def load_config(path: str | None) -> dict:
     target = Path(path) if path else Path("config.toml")
     if target.is_file():
-        try:
+        with contextlib.suppress(OSError, tomllib.TOMLDecodeError):
             with open(target, "rb") as f:
                 data = tomllib.load(f)
             flat = {}
@@ -60,23 +68,35 @@ def load_config(path: str | None) -> dict:
                     flat.update(v)
             flat.update({k: v for k, v in data.items() if not isinstance(v, dict)})
             return flat
-        except Exception:
-            pass
     return {}
 
 
 def main():
     parser = argparse.ArgumentParser(description="Uykum Geldi - Human detection alarm")
-    parser.add_argument("-s", "--source", default="0", help="Camera index or video file")
+    parser.add_argument(
+        "-s", "--source", default="0", help="Camera index or video file"
+    )
     parser.add_argument("-m", "--model", default="yolo11n.pt", help="YOLO model path")
-    parser.add_argument("-c", "--conf", type=float, default=0.40, help="Confidence threshold")
-    parser.add_argument("-d", "--device", default="auto", help="Compute device: auto, mps, cuda, cpu")
-    parser.add_argument("--cooldown", type=float, default=3.0, help="Alarm cooldown in seconds")
+    parser.add_argument(
+        "-c", "--conf", type=float, default=0.40, help="Confidence threshold"
+    )
+    parser.add_argument(
+        "-d", "--device", default="auto", help="Compute device: auto, mps, cuda, cpu"
+    )
+    parser.add_argument(
+        "--cooldown", type=float, default=3.0, help="Alarm cooldown in seconds"
+    )
     parser.add_argument("--sound", default="alarm.mp3", help="Path to alarm audio file")
-    parser.add_argument("--headless", action="store_true", help="Run without GUI window")
-    parser.add_argument("--no-notify", action="store_true", help="Disable desktop notifications")
+    parser.add_argument(
+        "--headless", action="store_true", help="Run without GUI window"
+    )
+    parser.add_argument(
+        "--no-notify", action="store_true", help="Disable desktop notifications"
+    )
     parser.add_argument("--fps-limit", type=float, default=None, help="Cap maximum FPS")
-    parser.add_argument("--skip-frames", type=int, default=0, help="Skip N frames between inferences")
+    parser.add_argument(
+        "--skip-frames", type=int, default=0, help="Skip N frames between inferences"
+    )
     parser.add_argument("--config", default=None, help="Path to TOML config file")
 
     args = parser.parse_args()
@@ -92,7 +112,7 @@ def main():
     model = YOLO(args.model)
     try:
         model.to(device)
-    except Exception:
+    except (RuntimeError, ValueError):
         device = "cpu"
         model.to(device)
 
@@ -100,7 +120,9 @@ def main():
     if not cap.isOpened():
         sys.exit(f"Error: Cannot open video source '{source}'.")
 
-    print(f"Monitoring on {device.upper()} ({'Headless' if args.headless else 'GUI: press q to exit'})...")
+    print(
+        f"Monitoring on {device.upper()} ({'Headless' if args.headless else 'GUI: press q to exit'})..."
+    )
 
     last_alert = 0.0
     frame_idx = 0
@@ -116,7 +138,9 @@ def main():
 
             frame_idx += 1
             if args.skip_frames == 0 or (frame_idx % (args.skip_frames + 1) == 0):
-                res = model.predict(frame, classes=[0], conf=args.conf, device=device, verbose=False)[0]
+                res = model.predict(
+                    frame, classes=[0], conf=args.conf, device=device, verbose=False
+                )[0]
                 has_person = len(res.boxes) > 0
                 if not args.headless:
                     annotated = res.plot()
