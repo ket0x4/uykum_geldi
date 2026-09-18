@@ -139,9 +139,13 @@ def main():
             frame_idx += 1
             if args.skip_frames == 0 or (frame_idx % (args.skip_frames + 1) == 0):
                 res = model.predict(
-                    frame, classes=[0], conf=args.conf, device=device, verbose=False
+                    frame, conf=args.conf, device=device, verbose=False
                 )[0]
-                has_person = len(res.boxes) > 0
+                has_person = (
+                    bool((res.boxes.cls == 0).any())
+                    if res.boxes is not None and len(res.boxes) > 0
+                    else False
+                )
                 if not args.headless:
                     annotated = res.plot()
 
